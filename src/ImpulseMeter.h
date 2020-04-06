@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <queue>
 #include <MyDateTime.h>
+#include "Logger.h"
 
 //#define IMPULSE_METER_DEBUG
 
@@ -31,7 +32,7 @@ public:
 
 	//**** user functions
 	// Setup the instance
-	void begin(uint8_t counterId, unsigned int timerIntervallInSec, char const sourceName[], callback_timerIntervallElapsed_t callbackTimerIntervallElapsed);
+	void begin(uint8_t counterId, unsigned int timerIntervallInSec, char const sourceName[], callback_timerIntervallElapsed_t callbackTimerIntervallElapsed, Logger* logger);
 	// Check if the  callback function should be called and if necessary call it with the collected impules.
 	// update should be called in the loop() function of main.c													
 	void update();													
@@ -53,6 +54,8 @@ private:
     unsigned int _timerIntervallInSec;                              // The intervall to call the timer intervall elapsed callback function
     String _sourceName;                                             // The name of this impulse source
 	std::queue<ImpulseContainer> _impulseQueue;
+
+	Logger* _logger;
 
 	//functions
 	// Check if the GPIO supports a interrupt

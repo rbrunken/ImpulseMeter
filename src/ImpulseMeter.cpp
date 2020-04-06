@@ -4,27 +4,32 @@ ImpulseMeter::~ImpulseMeter(){
     _disableInterrupt();
 }
 
-void ImpulseMeter::begin(uint8_t counterId, unsigned int timerIntervallInSec, char const sourceName[], callback_timerIntervallElapsed_t callbackTimerIntervallElapsed){
+
+void ImpulseMeter::begin(uint8_t counterId, unsigned int timerIntervallInSec, char const sourceName[], callback_timerIntervallElapsed_t callbackTimerIntervallElapsed, Logger* logger){
+    _logger = logger;
     if(counterId >= 0 && counterId <= MAX_COUNTERS){
-        _pulses_pin = gpioPins[counterId];
         _timerIntervallInSec = timerIntervallInSec;
         _sourceName = sourceName;
         _callbackTimerIntervallElapsed = callbackTimerIntervallElapsed;
-        pinMode(_pulses_pin, INPUT_PULLUP);
-        _calcFirstCallbackTime();
-        _enableInterrupt();
+
+        if(_isrInstalled == false){
+            _pulses_pin = gpioPins[counterId];
+            pinMode(_pulses_pin, INPUT_PULLUP);
+            _calcFirstCallbackTime();
+            _enableInterrupt();
+        }
     #ifdef IMPULSE_METER_DEBUG    
         if(_isrInstalled){
-            Serial.printf("Pin: %02d; Source: %s; Intervall in sec: %d; NextCallbackTime: %s\n", _pulses_pin, _sourceName.c_str(), _timerIntervallInSec, FormatTime(_nextCallbackTime));
+            _logger->printMessage("Pin: %02d; Source: %s; Intervall in sec: %d; NextCallbackTime: %s\n", _pulses_pin, _sourceName.c_str(), _timerIntervallInSec, FormatTime(_nextCallbackTime));
         }
         else
         {
-            Serial.printf("Pin: %02d is not supported. Source: %s\n", _pulses_pin, _sourceName.c_str());
+            _logger->printError("Pin: %02d is not supported. Source: %s\n", _pulses_pin, _sourceName.c_str());
         }
     #endif
     }
     else{
-        Serial.printf("CounterId: %02d is not supported. Source: %s\n", counterId, _sourceName.c_str());
+        _logger->printError("CounterId: %02d is not supported. Source: %s\n", counterId, _sourceName.c_str());
     }
 }
 
@@ -47,7 +52,7 @@ void ImpulseMeter::update(){
 void ImpulseMeter::_calcFirstCallbackTime(){
     time_t utcTime = DateTime.utcTime();
 #ifdef IMPULSE_METER_DEBUG    
-    Serial.printf("Current UTC time: %s\n",FormatTime(utcTime));
+    _logger->printMessage("Current UTC time: %s\n",FormatTime(utcTime));
 #endif
    	struct tm* startTime = gmtime(&utcTime);
     if (_timerIntervallInSec < 10)
@@ -82,7 +87,7 @@ void ImpulseMeter::_calcFirstCallbackTime(){
 
    	_nextCallbackTime = mktime(startTime) + _timerIntervallInSec;
 #ifdef IMPULSE_METER_DEBUG    
-    Serial.printf("Pin: %02d; First Callback Time: %s\n",_pulses_pin, FormatTime(_nextCallbackTime));
+    _logger->printMessage("Pin: %02d; First Callback Time: %s\n",_pulses_pin, FormatTime(_nextCallbackTime));
 #endif
 }
 
@@ -99,7 +104,7 @@ void ImpulseMeter::_calcNextCallbackTime()
     }
 
 #ifdef IMPULSE_METER_DEBUG    
-    Serial.printf("Pin: %02d; Next callback time: %s\n",_pulses_pin, FormatTime(_nextCallbackTime));
+    _logger->printMessage("Pin: %02d; Next callback time: %s\n",_pulses_pin, FormatTime(_nextCallbackTime));
 #endif
 }
 
@@ -127,7 +132,7 @@ void ImpulseMeter::_enableInterrupt()
 
     if (!_supportsInterrupt()){
 #ifdef IMPULSE_METER_DEBUG 
-    Serial.printf("PIN %d is not supported\n", _pulses_pin);
+    _logger->printMessage("PIN %d is not supported\n", _pulses_pin);
 #endif       
         return;        
     }
@@ -138,7 +143,7 @@ void ImpulseMeter::_enableInterrupt()
             _instances[i] = this;
             attachInterrupt(digitalPinToInterrupt(_pulses_pin), _isrCallbacks[i], RISING);
             #ifdef IMPULSE_METER_DEBUG 
-                Serial.printf("PIN %d is installed to instance %d\n", _pulses_pin, i);
+                _logger->printMessage("PIN %d is installed to instance %d\n", _pulses_pin, i);
             #endif       
             _isrInstalled = true;
             break;
@@ -146,7 +151,7 @@ void ImpulseMeter::_enableInterrupt()
     }
 
 #ifdef IMPULSE_METER_DEBUG 
-    if(_isrInstalled == false) Serial.printf("PIN %d is not setup because there is no free ISR function\n", _pulses_pin);
+    if(_isrInstalled == false) _logger->printMessage("PIN %d is not setup because there is no free ISR function\n", _pulses_pin);
 #endif       
 
 }

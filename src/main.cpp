@@ -11,6 +11,10 @@ using namespace std;
 
 #define MY_NAME "ESP1"
 
+unsigned long impulsesOverAll;
+
+void plotImpulses(ImpulseMeterStatus status);
+
 vector<string> split (const string &s, char delim) {
     vector<string> result;
     stringstream ss (s);
@@ -30,7 +34,6 @@ Logger logger;
 std::array<ImpulseMeter*,MAX_COUNTERS> impulseMeters;
 
 //***************** Begin MQTT *********************************
-const char SubscribeTopicCounter[] = "ESP1/Counter/#";
 
 EspMQTTClient mqttClient(
   "PothornFunk",
@@ -41,34 +44,66 @@ EspMQTTClient mqttClient(
   MY_NAME         // Client name that uniquely identify your device
 );
 
+void restartHandler(const String &message){
+  ESP.restart();
+}
 
-void installCounter(const String &message){
-  logger.printMessage("Get install counter message: %s\n",message.c_str());
-  vector<string> parameters = SPLIT_TAB(message.c_str());
-  uint32_t counterId;
-  istringstream(parameters[0]) >> counterId;
-  string sourceName = parameters[1];
-  uint32_t timerIntervallInSec;
-  istringstream(parameters[2]) >> timerIntervallInSec;
-  logger.printMessage("Get counterId: %u SourceName: %s timerIntervall %u\n", counterId, sourceName.c_str(), timerIntervallInSec);
+void getStatusHandler(const String &message){
+  int counters = 0;
+  for (size_t i = 0; i < MAX_COUNTERS; i++)
+  {
+    if(impulseMeters[i] != NULL){
+      counters++;
+    }
+  }
+
+  char buff[80];
+  snprintf(buff, 80, "%s\t%s\t%d\t%lu", FormatTime(DateTime.getTime()), FormatTime(DateTime.getBootTime()), counters, impulsesOverAll);
+  mqttClient.publish("Status/ESP1", buff);
+}
+
+// Install a counter to get the impulses.
+// The message has a ID, SourceName and a intervall separated by TAB
+void installCounterHandler(const String &message){
+  try
+  {
+    vector<string> parameters = SPLIT_TAB(message.c_str());
+    uint32_t counterId;
+    istringstream(parameters[0]) >> counterId;
+    string sourceName = parameters[1];
+    uint32_t timerIntervallInSec;
+    istringstream(parameters[2]) >> timerIntervallInSec;
+    ImpulseMeter* existingImpulseMeter = impulseMeters[counterId];
+    if(existingImpulseMeter != NULL){
+      existingImpulseMeter->begin(counterId, timerIntervallInSec, sourceName.c_str(), plotImpulses, &logger);
+      logger.printMessage("Update counterId: %u SourceName: %s timerIntervall %u\n", counterId, sourceName.c_str(), timerIntervallInSec);
+    }else
+    {
+      ImpulseMeter* impulseMeter = new ImpulseMeter();
+      impulseMeter->begin(counterId, timerIntervallInSec, sourceName.c_str(), plotImpulses, &logger);
+      impulseMeters[counterId] = impulseMeter;
+      logger.printMessage("Add counterId: %u SourceName: %s timerIntervall %u\n", counterId, sourceName.c_str(), timerIntervallInSec);
+    }
+  }
+  catch(const std::exception& e)
+  {
+    logger.printError("Failed to install the counter: '%s'::  %s", message, e.what());
+  }
 }
 
 void setupMqttSubscriber(){
   if(mqttClient.isConnected()){
-    mqttClient.subscribe(SubscribeTopicCounter, installCounter);
+    mqttClient.subscribe("ESP1/InstallCounter", installCounterHandler);
+    mqttClient.subscribe("ESP1/Restart",restartHandler);
+    mqttClient.subscribe("ESP1/GetStatus",getStatusHandler);
   }
 }
 //***************** End MQTT *********************************
 
 
 //***************** Begin ImpulseMeter *********************************
-#define METER1_ID 0
-#define METER2_ID 3
 #define AUTO_TEST true              //If true, a signal will be generated in pin SIGNAL_PIN to simulate the meter 
 //signal, this pin must be connected to pin METER_PIN.
-
-ImpulseMeter meter1;
-ImpulseMeter meter2;
 
 #if AUTO_TEST
 const int pwmPin = 4;  // 4 corresponds to GPIO16
@@ -78,7 +113,7 @@ const int pwmChannel = 0;
 const int pwmResolution = 8;
 #endif
 
-#define UPDATE_PERIOD 25 * 1000 // 25 Sec
+#define UPDATE_PERIOD 1 * 1000 // 1 Sec
 unsigned long _lastUpdate;
 
 void plotImpulses(ImpulseMeterStatus status)
@@ -87,11 +122,10 @@ void plotImpulses(ImpulseMeterStatus status)
   logger.printMessage("%s - Source: %s; Intervall in sec: %d; Time: %s; Impulses: %lu\n", DateTime.toISOString().c_str(), status.sourceName, status.timerIntervallInSec, FormatTime(status.utcTime), status.impulse);
   snprintf(payload, sizeof(payload),"%s\t%lu", FormatTime(status.utcTime), status.impulse);
   mqttClient.publish(status.sourceName, payload, false);
+  impulsesOverAll += status.impulse;
 }
 
 void setupMeter() {
-  meter1.begin(METER1_ID, 60,"Engergy/Wohnzimmer", plotImpulses);
-  meter2.begin(METER2_ID, 60,"Engergy/Arbeit", plotImpulses);
 #if AUTO_TEST
   // configure LED PWM functionalitites
   ledcSetup(pwmChannel, pwmFrequenz, pwmResolution);
@@ -138,13 +172,19 @@ void onConnectionEstablished() {
   logger.printMessage("Current UTC time: %s\n",DateTime.toISOString().c_str());
   setupMeter();
   setupMqttSubscriber();
+  mqttClient.publish("Energy/GetCounterConfig",MY_NAME, true);
 }
 
 void loop() {
   if (millis() - _lastUpdate >= UPDATE_PERIOD)
   {
-    meter1.update();
-    meter2.update();
+    for (size_t i = 0; i < MAX_COUNTERS; i++)
+    {
+      if(impulseMeters[i] != NULL){
+        impulseMeters[i]->update();
+      }
+    }
+    
     _lastUpdate = millis();
   }
 

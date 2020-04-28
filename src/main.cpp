@@ -59,7 +59,9 @@ void getStatusHandler(const String &message){
 
   char buff[80];
   snprintf(buff, 80, "%s\t%s\t%d\t%lu", FormatTime(DateTime.getTime()), FormatTime(DateTime.getBootTime()), counters, impulsesOverAll);
-  mqttClient.publish("Status/ESP1", buff);
+  string topic = "Status/";
+  topic += MY_NAME;
+  mqttClient.publish(topic.c_str(), buff);
 }
 
 // Install a counter to get the impulses.
@@ -93,9 +95,13 @@ void installCounterHandler(const String &message){
 
 void setupMqttSubscriber(){
   if(mqttClient.isConnected()){
-    mqttClient.subscribe("ESP1/InstallCounter", installCounterHandler);
-    mqttClient.subscribe("ESP1/Restart",restartHandler);
-    mqttClient.subscribe("ESP1/GetStatus",getStatusHandler);
+    string myName = MY_NAME;
+    string topic = myName + "/InstallCounter";
+    mqttClient.subscribe(topic.c_str(), installCounterHandler);
+    topic = myName + "/Restart";
+    mqttClient.subscribe(topic.c_str(),restartHandler);
+    topic = myName + "/GetStatus";
+    mqttClient.subscribe(topic.c_str(),getStatusHandler);
   }
 }
 //***************** End MQTT *********************************
@@ -172,7 +178,9 @@ void onConnectionEstablished() {
   logger.printMessage("Current UTC time: %s\n",DateTime.toISOString().c_str());
   setupMeter();
   setupMqttSubscriber();
-  mqttClient.publish("Energy/GetCounterConfig",MY_NAME, true);
+  string topic = "GetCounterConfig/";
+  topic += MY_NAME;
+  mqttClient.publish(topic.c_str(),"", true);
 }
 
 void loop() {

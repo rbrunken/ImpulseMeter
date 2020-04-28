@@ -5,8 +5,8 @@
 
 using namespace std;
 
-#define ERROR_TOPIC_PREFIX "error/"
-#define MESSAGE_TOPIC_PREFIX "info/"
+#define ERROR_TOPIC_PREFIX "Error/"
+#define MESSAGE_TOPIC_PREFIX "Info/"
 
 class Logger
 {

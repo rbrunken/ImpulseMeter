@@ -110,11 +110,11 @@ void ImpulseMeter::_calcNextCallbackTime()
 
 void ImpulseMeter::_isrCallback(){
     if(DateTime.utcTime() > _nextCallbackTime){
+        _calcNextCallbackTime();
         ImpulseContainer container;
         container.impulse = _impulse;
         container.utcTime = _nextCallbackTime;
         _impulseQueue.push(container);
-        _calcNextCallbackTime();
         _impulse = 0;
     }
 

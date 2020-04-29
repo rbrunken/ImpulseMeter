@@ -64,6 +64,19 @@ void getStatusHandler(const String &message){
   mqttClient.publish(topic.c_str(), buff);
 }
 
+void DebugMqttHandler(const String &message){
+  try
+  {
+    bool enable;
+    istringstream(message.c_str()) >> enable;
+    mqttClient.enableDebuggingMessages(enable);
+  }
+  catch(const std::exception& e)
+  {
+    logger.printError("Failed to set MQTT debug on/off. Wrong message format: '%s'::  %s", message, e.what());
+  }
+}
+
 // Install a counter to get the impulses.
 // The message has a ID, SourceName and a intervall separated by TAB
 void installCounterHandler(const String &message){
@@ -102,6 +115,8 @@ void setupMqttSubscriber(){
     mqttClient.subscribe(topic.c_str(),restartHandler);
     topic = myName + "/GetStatus";
     mqttClient.subscribe(topic.c_str(),getStatusHandler);
+    topic = myName + "/DebugMQTT";
+    mqttClient.subscribe(topic.c_str(),DebugMqttHandler);
   }
 }
 //***************** End MQTT *********************************
@@ -157,13 +172,16 @@ void setupDateTime() {
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  logger.begin(MY_NAME, &mqttClient);
+  logger.begin((char *)MY_NAME, &mqttClient);
   // Clear the array with the impulse meters.
   impulseMeters.fill(NULL);
   // Optionnal functionnalities of EspMQTTClient :
-  mqttClient.enableDebuggingMessages(); // Enable debugging messages sent to serial output
+  //mqttClient.enableDebuggingMessages(); // Enable debugging messages sent to serial output
   mqttClient.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overrited with enableHTTPWebUpdater("user", "password").
-  mqttClient.enableLastWillMessage("TestClient/lastwill", "I am going offline");  // You can activate the retain flag by setting the third parameter to true
+  // If I change the topic form TestClient/lastwill to LastWill/ESP1 then the client can´t connect to the broker!?
+  //string topic = "LastWill/";
+  //topic += MY_NAME;
+  //mqttClient.enableLastWillMessage("TestClient/lastwill", "I am going offline");  // You can activate the retain flag by setting the third parameter to true
 }
 
 // This function is called once everything is connected (Wifi and MQTT)

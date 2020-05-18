@@ -13,6 +13,9 @@ using namespace std;
 
 unsigned long impulsesOverAll;
 
+#define PUBLISH_READY_PERIOD 5 * 1000 // 5 Sec.
+ulong _nextPublishReadyTime;
+
 void plotImpulses(ImpulseMeterStatus status);
 
 vector<string> split (const string &s, char delim) {
@@ -48,7 +51,7 @@ void restartHandler(const String &message){
   ESP.restart();
 }
 
-void getStatusHandler(const String &message){
+int getInstalledCounters(){
   int counters = 0;
   for (size_t i = 0; i < MAX_COUNTERS; i++)
   {
@@ -57,6 +60,11 @@ void getStatusHandler(const String &message){
     }
   }
 
+  return counters;
+}
+
+void getStatusHandler(const String &message){
+  int counters = getInstalledCounters();
   char buff[80];
   snprintf(buff, 80, "%s\t%s\t%d\t%lu", FormatTime(DateTime.getTime()), FormatTime(DateTime.getBootTime()), counters, impulsesOverAll);
   string topic = "Status/";
@@ -119,11 +127,18 @@ void setupMqttSubscriber(){
     mqttClient.subscribe(topic.c_str(),DebugMqttHandler);
   }
 }
+
+void PublishReady(){
+  string topic = "Ready/";
+  topic += MY_NAME;
+  mqttClient.publish(topic.c_str(),"", true);
+  _nextPublishReadyTime = millis() + PUBLISH_READY_PERIOD;
+}
 //***************** End MQTT *********************************
 
 
 //***************** Begin ImpulseMeter *********************************
-#define AUTO_TEST true              //If true, a signal will be generated in pin SIGNAL_PIN to simulate the meter 
+#define AUTO_TEST false              //If true, a signal will be generated in pin SIGNAL_PIN to simulate the meter 
 //signal, this pin must be connected to pin METER_PIN.
 
 #if AUTO_TEST
@@ -134,8 +149,8 @@ const int pwmChannel = 0;
 const int pwmResolution = 8;
 #endif
 
-#define UPDATE_PERIOD 1 * 1000 // 1 Sec
-unsigned long _lastUpdate;
+#define IMPULSE_METER_UPDATE_PERIOD 1 * 1000 // 1 Sec
+unsigned long _nextImpulseMeterUpdate;
 
 void plotImpulses(ImpulseMeterStatus status)
 {
@@ -176,7 +191,7 @@ void setup() {
   // Clear the array with the impulse meters.
   impulseMeters.fill(NULL);
   // Optionnal functionnalities of EspMQTTClient :
-  //mqttClient.enableDebuggingMessages(); // Enable debugging messages sent to serial output
+  mqttClient.enableDebuggingMessages(); // Enable debugging messages sent to serial output
   mqttClient.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overrited with enableHTTPWebUpdater("user", "password").
   // If I change the topic form TestClient/lastwill to LastWill/ESP1 then the client can´t connect to the broker!?
   //string topic = "LastWill/";
@@ -196,13 +211,16 @@ void onConnectionEstablished() {
   logger.printMessage("Current UTC time: %s\n",DateTime.toISOString().c_str());
   setupMeter();
   setupMqttSubscriber();
-  string topic = "GetCounterConfig/";
-  topic += MY_NAME;
-  mqttClient.publish(topic.c_str(),"", true);
+  PublishReady();
 }
 
 void loop() {
-  if (millis() - _lastUpdate >= UPDATE_PERIOD)
+  if (_nextPublishReadyTime < millis() && getInstalledCounters() == 0){
+    // Publish Ready over MQTT
+    PublishReady();
+  } 
+  
+  if (_nextImpulseMeterUpdate < millis())
   {
     for (size_t i = 0; i < MAX_COUNTERS; i++)
     {
@@ -211,7 +229,7 @@ void loop() {
       }
     }
     
-    _lastUpdate = millis();
+    _nextImpulseMeterUpdate = millis() +  IMPULSE_METER_UPDATE_PERIOD;
   }
 
   delay(100);

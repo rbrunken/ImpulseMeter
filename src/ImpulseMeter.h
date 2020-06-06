@@ -17,8 +17,8 @@ struct ImpulseMeterStatus
 };
 
 // The mapping of the CounterId to the GPIO Pin. The Index is the CounterID and the value is the GPIO Pin.
-const static int MAX_COUNTERS = 22;
-const static int gpioPins[MAX_COUNTERS] = {2, 12, 5, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 34, 35, 36, 39};
+const static int MAX_COUNTERS = 20;
+const static int gpioPins[MAX_COUNTERS] = {2, 12, 5, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 34, 35, 36, 39};
 
 // Collect impulses from a GPIO Pin for a specific time intervall and give the collect impulses and 
 // the end time of the collection back to a callback function. After that starts a new collection of impulses.

@@ -11,10 +11,19 @@ using namespace std;
 
 #define MY_NAME "ESP1"
 
+#define LED_RED_PIN 32
+#define LED_GREEN_PIN 33
+#define LED_PERIOD 500 // 0,5 Sec.
+ulong _nextLedTime;
+int8_t _ledState;
+
 unsigned long impulsesOverAll;
 
 #define PUBLISH_READY_PERIOD 5 * 1000 // 5 Sec.
 ulong _nextPublishReadyTime;
+
+#define HEARTBEAT_PERIOD 60 * 1000 // 1 minute
+ulong _nextHeartbeatTime;
 
 void plotImpulses(ImpulseMeterStatus status);
 
@@ -37,6 +46,7 @@ Logger logger;
 std::array<ImpulseMeter*,MAX_COUNTERS> impulseMeters;
 
 //***************** Begin MQTT *********************************
+void PublishStatus();
 
 EspMQTTClient mqttClient(
   "PothornFunk",
@@ -64,12 +74,7 @@ int getInstalledCounters(){
 }
 
 void getStatusHandler(const String &message){
-  int counters = getInstalledCounters();
-  char buff[80];
-  snprintf(buff, 80, "%s\t%s\t%d\t%lu", FormatTime(DateTime.getTime()), FormatTime(DateTime.getBootTime()), counters, impulsesOverAll);
-  string topic = "Status/";
-  topic += MY_NAME;
-  mqttClient.publish(topic.c_str(), buff);
+  PublishStatus();
 }
 
 void DebugMqttHandler(const String &message){
@@ -134,6 +139,16 @@ void PublishReady(){
   mqttClient.publish(topic.c_str(),"", true);
   _nextPublishReadyTime = millis() + PUBLISH_READY_PERIOD;
 }
+
+void PublishStatus(){
+  int counters = getInstalledCounters();
+  char buff[80];
+  snprintf(buff, 80, "%s\t%s\t%d\t%lu", FormatTime(DateTime.getTime()), FormatTime(DateTime.getBootTime()), counters, impulsesOverAll);
+  string topic = "Status/";
+  topic += MY_NAME;
+  mqttClient.publish(topic.c_str(), buff);
+}
+
 //***************** End MQTT *********************************
 
 
@@ -185,13 +200,20 @@ void setupDateTime() {
 }
 
 void setup() {
+  // LED PINs as output
+  pinMode(LED_GREEN_PIN, OUTPUT);
+  pinMode(LED_RED_PIN, OUTPUT);
+  // Red LED on
+  digitalWrite (LED_RED_PIN, HIGH);
+
   // put your setup code here, to run once:
   Serial.begin(115200);
   logger.begin((char *)MY_NAME, &mqttClient);
+  
   // Clear the array with the impulse meters.
   impulseMeters.fill(NULL);
   // Optionnal functionnalities of EspMQTTClient :
-  mqttClient.enableDebuggingMessages(); // Enable debugging messages sent to serial output
+  mqttClient.enableDebuggingMessages(false); // Disable debugging messages sent to serial output
   mqttClient.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overrited with enableHTTPWebUpdater("user", "password").
   // If I change the topic form TestClient/lastwill to LastWill/ESP1 then the client can´t connect to the broker!?
   //string topic = "LastWill/";
@@ -212,13 +234,23 @@ void onConnectionEstablished() {
   setupMeter();
   setupMqttSubscriber();
   PublishReady();
+
+  // LED red off and LED green on
+  digitalWrite (LED_RED_PIN, LOW);	
+  digitalWrite (LED_GREEN_PIN, HIGH);	
 }
 
 void loop() {
   if (_nextPublishReadyTime < millis() && getInstalledCounters() == 0){
-    // Publish Ready over MQTT
+    // Publish Ready over MQTT, because no counter is installed.
     PublishReady();
-  } 
+  }
+
+  if(_nextHeartbeatTime < millis()){
+    // Publish the status over MQTT as a heartbeat
+    PublishStatus();
+    _nextHeartbeatTime = millis() + HEARTBEAT_PERIOD;
+  }
   
   if (_nextImpulseMeterUpdate < millis())
   {

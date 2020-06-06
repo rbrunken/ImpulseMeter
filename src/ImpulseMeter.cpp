@@ -14,7 +14,7 @@ void ImpulseMeter::begin(uint8_t counterId, unsigned int timerIntervallInSec, ch
 
         if(_isrInstalled == false){
             _pulses_pin = gpioPins[counterId];
-            pinMode(_pulses_pin, INPUT_PULLUP);
+            pinMode(_pulses_pin, INPUT_PULLDOWN);
             _calcFirstCallbackTime();
             _enableInterrupt();
         }

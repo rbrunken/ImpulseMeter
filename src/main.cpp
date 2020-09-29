@@ -9,7 +9,9 @@
 
 using namespace std;
 
-#define MY_NAME "ESP1"
+#define MY_NAME "ESPT"
+
+#define MQTT_DEBUG true
 
 #define LED_RED_PIN 32
 #define LED_GREEN_PIN 33
@@ -213,7 +215,7 @@ void setup() {
   // Clear the array with the impulse meters.
   impulseMeters.fill(NULL);
   // Optionnal functionnalities of EspMQTTClient :
-  mqttClient.enableDebuggingMessages(false); // Disable debugging messages sent to serial output
+  mqttClient.enableDebuggingMessages(MQTT_DEBUG); // Enable/disable debugging messages sent to serial output
   mqttClient.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overrited with enableHTTPWebUpdater("user", "password").
   // If I change the topic form TestClient/lastwill to LastWill/ESP1 then the client can´t connect to the broker!?
   //string topic = "LastWill/";

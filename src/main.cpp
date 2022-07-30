@@ -51,7 +51,7 @@ std::array<ImpulseMeter*,MAX_COUNTERS> impulseMeters;
 void PublishStatus();
 
 EspMQTTClient mqttClient(
-  "PothornFunk",
+  "PothornWelle",
   "Sguea@rbr",
   "192.168.2.20",   // MQTT Broker server ip on OpenHab PI
   "",             // Can be omitted if not needed

@@ -50,7 +50,7 @@ void ImpulseMeter::update(){
 }
 
 void ImpulseMeter::_calcFirstCallbackTime(){
-    time_t utcTime = DateTime.utcTime();
+    time_t utcTime = DateTime.getTime();
 #ifdef IMPULSE_METER_DEBUG    
     _logger->printMessage("Current UTC time: %s\n",FormatTime(utcTime));
 #endif
@@ -93,7 +93,7 @@ void ImpulseMeter::_calcFirstCallbackTime(){
 
 void ImpulseMeter::_calcNextCallbackTime()
 {
-	time_t dif = DateTime.utcTime() - _nextCallbackTime;
+	time_t dif = DateTime.getTime() - _nextCallbackTime;
 	if(dif > _timerIntervallInSec)
 	{
 		_nextCallbackTime = _nextCallbackTime + dif / _timerIntervallInSec * _timerIntervallInSec + _timerIntervallInSec;
@@ -109,7 +109,7 @@ void ImpulseMeter::_calcNextCallbackTime()
 }
 
 void ImpulseMeter::_isrCallback(){
-    if(DateTime.utcTime() > _nextCallbackTime){
+    if(DateTime.getTime() > _nextCallbackTime){
         _calcNextCallbackTime();
         ImpulseContainer container;
         container.impulse = _impulse;

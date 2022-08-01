@@ -192,7 +192,7 @@ void setupMeter() {
 void setupDateTime() {
   // setup this after wifi connected
   // Set TimeZone to UTC
-  DateTime.setTimeZone(0);
+  DateTime.setTimeZone("UTC");
   // this method config ntp and wait for time sync
   // default timeout is 10 seconds
   DateTime.begin(/* timeout param */);

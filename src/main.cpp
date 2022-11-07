@@ -9,7 +9,7 @@
 
 using namespace std;
 
-#define MY_NAME "ESPT"
+#define MY_NAME "ESP1"
 
 #define MQTT_DEBUG true
 
